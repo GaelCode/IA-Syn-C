@@ -1,0 +1,11 @@
+{
+    // 1. On garde l'association pour la coloration
+    "files.associations": {
+        "*.sync": "c" 
+        // (Remplacez *.sync par votre extension de fichier)
+    },
+
+    // 2. On désactive la vérification d'erreurs C/C++
+    //    UNIQUEMENT pour ce dossier (workspace)
+    "C_Cpp.errorSquiggles": "disabled"
+}
