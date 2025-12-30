@@ -1,89 +1,58 @@
 /**
-    =====================================================================
+    --------------------------------------------------------
     IA pour Roll For The Milkyway - Projet MEIM11
-    Auteur: [VOTRE NOM ICI]
-    ## Explication de l'algorithme (4 points)
+    Auteur: Gaël ODDOS-MARCEL
 
-    [ATTENTION : VOUS DEVEZ REMPLIR CETTE SECTION VOUS-MÊME]
-    [Expliquez l'algorithme ci-dessous avec vos propres mots.]
-    [Exemple de ce que vous pourriez dire :]
+    ## Explication de l'algorithme
 
-    Mon IA implémente une stratégie "gloutonne" (greedy) :
+    Mon IA utilise une stratégie dite "gloutonne". L'objectif est de 
+    toujours prendre la décision qui semble la plus rentable en calculant un rapport bénéfice/coût.
 
-    1.  Stratégie de Mouvement (fonction phase_deplacement_des) :
-    À chaque action, l'IA ré-évalue la situation :
-    - Elle calcule le "meilleur" objectif à viser (fonction trouver_meilleur_obj).
-    - Le "meilleur" est celui avec le score le plus élevé,
-      calculé par : score = (points * 100) / (distance + 1).
-    - La "distance" est le nombre total de ressources manquantes.
-    - Une fois l'objectif cible choisi, l'IA analyse chaque dé (personnel et partagé) :
-    - Elle cherche la ressource *manquante* pour l'objectif qui est
-      la plus "proche" sur ce dé (chemin le plus court, en avant ou en arrière).
-    - Elle envoie l'ordre de mouvement pour se rapprocher de cette ressource.
-    - Elle respecte la règle de ne bouger qu'un seul dé partagé au maximum.
+    1. Stratégie de Choix de l'Objectif (Ciblage) :
+    Plutôt que de viser un objectif au hasard, l'IA calcule un score de priorité pour chaque mission disponible. La formule utilisée est la suivante :
+    $$Score = \frac{Points \times 100}{Distance + 1}$$
+    La "distance" représente le nombre total de ressources qu'il manque pour accomplir cet objectif. Plus un objectif rapporte de points et plus il est proche d'être complété, plus son score est élevé. 
 
-    2.  Stratégie de Revendication (fonction phase_revendication) :
-    C'est la même que la version précédente, qui est déjà optimale :
-    - Elle calcule les 8 ressources qu'elle possède.
-    - Elle parcourt les 9 objectifs, en commençant par les plus
-      précieux (Difficile -> Intermédiaire -> Facile).
-    - Elle revendique le premier objectif qu'elle trouve, qui
-      n'est pas déjà pris ET pour lequel elle a les ressources.
-    - Si aucun n'est trouvable, elle passe (PASS).
+    2. Stratégie de Mouvement (Phase de déplacement) :
+    Une fois l'objectif cible choisi, l'IA analyse chaque dé pour voir s'il peut aider à combler un manque. Pour chaque dé, elle regarde les faces en avant et en arrière pour trouver la ressource manquante la plus proche. 
+    Elle applique ensuite le mouvement minimal (1 ou -1). Elle respecte la règle de sécurité : un seul mouvement maximum sur les dés partagés.
 
-    ## Aide de l'IA (CHAT-GPT / Outils similaires)
+    3. Stratégie de Revendication (Validation) :
+    L'IA vérifie ses ressources actuelles et les compare aux objectifs. Elle tente de valider en priorité les objectifs les plus difficiles (qui rapportent le plus de points) s'ils sont réalisables. 
+    Si rien n'est faisable, elle passe son tour.
 
-    [Expliquez ici comment vous vous êtes fait aider, comme demandé.]
-    [Exemple :]
-    "J'ai demandé à Gemini (une IA de Google) de m'aider à déboguer
-    mon code SYN-C. Après avoir corrigé les erreurs de mémoire, je lui
-    ai demandé d'implémenter une nouvelle stratégie "gloutonne" pour
-    la sélection d'objectifs et le mouvement des dés. L'IA m'a
-    fournit les nouvelles fonctions (deplacement_de_ressource,
-    trouver_meilleur_obj) et a modifié ma fonction
-    phase_deplacement_des pour utiliser cette nouvelle logique."
-    =====================================================================
+    ## Aide de l'IA
+    J'ai utilisé une intelligence artificielle pour m'aider à concevoir la structure technique du projet et pour définir la logique de la fonction gloutonne, ce qui m'a permis de mieux visualiser comment prioriser les ressources manquantes par rapport aux points de victoire.
+    --------------------------------------------------------
 */
 
-// =====================================================================
-// VARIABLES GLOBALES
-// =====================================================================
+/**
+--------------------------------------------------------
+VARIABLES GLOBALES
+--------------------------------------------------------
+ */
 
 GLOBALS
-    mon_id = 0          // Votre numéro d'exploratrice (E)
-    nombre_joueurs = 0       // Le nombre total d'exploratrices (NE)
-    tour_actuel = 0    // Le tour actuel (1, 2 ou 3)
-    action_actuelle = 0    // L'action actuelle (1 à 6)
+    mon_id = 0               // Identifiant de mon exploratrice
+    nombre_joueurs = 0       // Nombre total de joueurs
+    tour_actuel = 0          // Index du tour (1 à 3)
+    action_actuelle = 0      // Index de l'action (1 à 6)
 
-    // --- Données statiques des dés ---
-    // de_faces[i] = Pointeur vers un MALLOC(nb_faces) contenant les codes de ressource (0=PE, 1=H3, 2=AM, 3=MN)
-    de_faces = 0
-    // de_faces_compte[i] = Nombre de faces du dé i
-    de_faces_compte = 0  
+    de_faces = 0             // Tableau contenant la composition de chaque dé
+    de_faces_compte = 0      // Tableau contenant le nombre de faces par dé
+    face_visible_de = 0      // Index de la face actuellement sur le dessus
 
-    // --- État dynamique du jeu ---
-    // face_visible_de[i] = Index (0 à 5) de la face visible du dé i
-    face_visible_de = 0
-
-    // player_infos[i] = Pointeur vers un MALLOC_STRUCT(player_info) pour le joueur i (indexé 0 à NE-1)
-    player_infos = 0
-
-    // liste_objectifs[i] = Pointeur vers un MALLOC_STRUCT(objective) pour l'objectif i du tour (0 à 8)
-    liste_objectifs = 0  
-
-    // objectifs_effectues[OID] = TRUE si l'objectif OID a été revendiqué, FALSE sinon (taille 31)
-    objectifs_effectues = 0
+    player_infos = 0         // Informations sur les scores et l'état des joueurs
+    liste_objectifs = 0      // Liste des 9 objectifs du tour en cours
+    objectifs_effectues = 0  // Registre des objectifs déjà validés (Set de booléens)
 ENDGLOBALS
 
-
-
-// =====================================================================
-// STRUCTURES DE DONNÉES
-// =====================================================================
-
 /**
-    Stocke les informations sur un objectif (ceux du tour actuel).
- */
+--------------------------------------------------------
+STRUCTURES DE DONNÉES
+--------------------------------------------------------
+ */
+
 STRUCT objective
     id
     points
@@ -93,48 +62,43 @@ STRUCT objective
     mn
 ENDSTRUCT
 
-/**
-    Stocke les informations sur un joueur (vous ou un adversaire).
- */
 STRUCT player_info
     score
     est_actif
 ENDSTRUCT
 
-/**
- * Stocke le résultat de l'analyse d'un mouvement
- */
 STRUCT analyse_mouvement
-    distance // La distance la plus courte (0, 1, 2, etc.)
-    direction // -1 (arrière), 0 (ne pas bouger), 1 (avant)
+    distance 
+    direction 
 ENDSTRUCT
 
-// =====================================================================
-// FONCTIONS UTILITAIRES (DÉS)
-// =====================================================================
-
 /**
-    Calcule le nouvel index de face pour un dé, en gérant le "wrap-around".
- */
+--------------------------------------------------------
+Calcule la position d'une face après un mouvement.
+Cette fonction gère la boucle infinie du dé :
+si on dépasse la dernière face, on revient à la première, et inversement.
+--------------------------------------------------------
+ */
 FUNCTION prochaine_face(de_index, index_face_de, move)
     nombres_faces = de_faces_compte[de_index]
     new_face_index = index_face_de + move
-    // Gère le "wrap-around" (boucle)
-    // Note : On utilise un WHILE pour gérer les gros mouvements (ex: +3 sur un dé partagé)
+    
     WHILE (new_face_index < 0)
-        new_face_index = new_face_index + nombres_faces // Revient à la fin
+        new_face_index = new_face_index + nombres_faces 
     ENDWHILE
     
     WHILE (new_face_index >= nombres_faces)
-        new_face_index = new_face_index - nombres_faces // Revient au début
+        new_face_index = new_face_index - nombres_faces 
     ENDWHILE
 
     RETURN new_face_index
 END
 
 /**
-    Renvoie le code de ressource (0-3) de la face actuelle d'un dé.
- */
+--------------------------------------------------------
+Récupère le type de ressource (0 à 3) situé sur la face visible d'un dé spécifique.
+--------------------------------------------------------
+ */
 FUNCTION ressource_pour_de(de_index)
     face_index = face_visible_de[de_index]
     resource_de = de_faces[de_index][face_index]
@@ -142,15 +106,16 @@ FUNCTION ressource_pour_de(de_index)
 END
 
 /**
- * Analyse le mouvement optimal pour un dé vers une ressource.
- * Renvoie un STRUCT analyse_mouvement (à FREE).
- * resource_code: 0=PE, 1=H3, 2=AM, 3=MN
+--------------------------------------------------------
+Analyse le chemin le plus court pour qu'un dé affiche une ressource précise.
+La fonction compare le nombre de clics nécessaires en allant vers l'avant ou vers l'arrière. 
+Elle retourne la direction (-1, 0, ou 1) et la distance.
+--------------------------------------------------------
  */
 FUNCTION deplacement_de_ressource(de_index, resource_code)
     nombres_faces = de_faces_compte[de_index]
     index_face_de = face_visible_de[de_index]
     
-    // 1. Vérifier la face actuelle
     ressource_actuelle = ressource_pour_de(de_index)
     IF (ressource_actuelle == resource_code)
         analysis = MALLOC_STRUCT(analyse_mouvement)
@@ -159,16 +124,12 @@ FUNCTION deplacement_de_ressource(de_index, resource_code)
         RETURN analysis
     ENDIF
 
-    // 2. Chercher en avant et en arrière
     dist_forward = 10
     dist_backward = 10
-    
-    // On ne cherche que jusqu'à la moitié (inutile d'aller plus loin)
     max_search = (nombres_faces / 2) + 1 
     
     i = 1
     WHILE(i < max_search)
-        // Regarde en avant
         IF (dist_forward == 10)
             next_face_idx = prochaine_face(de_index, index_face_de, i)
             IF (de_faces[de_index][next_face_idx] == resource_code)
@@ -176,7 +137,6 @@ FUNCTION deplacement_de_ressource(de_index, resource_code)
             ENDIF
         ENDIF
         
-        // Regarde en arrière
         IF (dist_backward == 10)
             prev_face_idx = prochaine_face(de_index, index_face_de, 0 - i)
             IF (de_faces[de_index][prev_face_idx] == resource_code)
@@ -184,47 +144,38 @@ FUNCTION deplacement_de_ressource(de_index, resource_code)
             ENDIF
         ENDIF
         
-        // Si on a trouvé dans les deux directions, on arrête
         IF (dist_forward != 10 AND dist_backward != 10)
             i = max_search
         ENDIF
-        
         i = i + 1
     ENDWHILE
     
-    // 3. Renvoyer le meilleur résultat
     analysis = MALLOC_STRUCT(analyse_mouvement)
-    
     IF (dist_forward <= dist_backward)
         analysis->distance = dist_forward
         analysis->direction = 1
-    ELIF (dist_backward < 10) // Note: "dist_backward < dist_forward"
+    ELIF (dist_backward < 10)
         analysis->distance = dist_backward
         analysis->direction = -1
     ELSE
-        // Ressource non trouvée sur ce dé
         analysis->distance = 10
-        analysis->direction = 0 // Ne pas bouger si on ne trouve pas
+        analysis->direction = 0
     ENDIF
     
     RETURN analysis
 END
 
-// =====================================================================
-// INITIALISATION ET NETTOYAGE
-// =====================================================================
-
-/**
-    Lit les infos de début de partie (NE, E) et alloue toute
-    la mémoire nécessaire pour les variables globales.
- */
+ /**
+--------------------------------------------------------
+Prépare l'environnement de jeu au lancement.
+Cette fonction alloue la mémoire pour les joueurs, les objectifs et définit la composition fixe de chaque face des 8 dés du jeu.
+--------------------------------------------------------
+ */
 FUNCTION initialisation()
     nombre_joueurs = READ()
     mon_id = READ()
-    
     tour_actuel = 0
 
-    // Alloue le tableau des joueurs
     player_infos = MALLOC(nombre_joueurs)
     FOR(i;0;nombre_joueurs)
         player_infos[i] = MALLOC_STRUCT(player_info)
@@ -232,48 +183,34 @@ FUNCTION initialisation()
         player_infos[i]->est_actif = TRUE
     ENDFOR
 
-    // Alloue le tableau des 9 objectifs du tour
     liste_objectifs = MALLOC(9)
     FOR(i;0;9)
         liste_objectifs[i] = MALLOC_STRUCT(objective)
     ENDFOR
 
-    // Alloue et initialise les dés (faces actuelles)
     face_visible_de = MALLOC(8, 0, 0, 0, 0, 0, 0, 0, 0)
-
-    // Alloue et initialise le "set" des objectifs revendiqués
     objectifs_effectues = MALLOC(31)
     FOR(i;0;31)
         objectifs_effectues[i] = FALSE
     ENDFOR
 
-    // Alloue le tableau des compteurs de faces
     de_faces_compte = MALLOC(8, 4, 4, 4, 4, 5, 6, 5, 6)
-
-    // Alloue le tableau principal (qui contiendra 8 pointeurs)
     de_faces = MALLOC(8)
-
-    // D1: PE AM MN AM (0 2 3 2)
     de_faces[0] = MALLOC(4, 0, 2, 3, 2)
-    // D2: PE H3 MN H3 (0 1 3 1)
     de_faces[1] = MALLOC(4, 0, 1, 3, 1)
-    // D3: PE H3 MN AM (0 1 3 2)
     de_faces[2] = MALLOC(4, 0, 1, 3, 2)
-    // D4: H3 MN AM MN (1 3 2 3)
     de_faces[3] = MALLOC(4, 1, 3, 2, 3)
-    // D5: PE PE H3 H3 PE (0 0 1 1 0)
     de_faces[4] = MALLOC(5, 0, 0, 1, 1, 0)
-    // D6: PE H3 H3 AM H3 H3 (0 1 1 2 1 1)
     de_faces[5] = MALLOC(6, 0, 1, 1, 2, 1, 1)
-    // D7: PE H3 AM AM H3 (0 1 2 2 1)
     de_faces[6] = MALLOC(5, 0, 1, 2, 2, 1)
-    // D8: PE AM H3 MN AM H3 (0 2 1 3 2 1)
     de_faces[7] = MALLOC(6, 0, 2, 1, 3, 2, 1)
 END
 
-/**
-Libère toute la mémoire allouée dynamiquement.
-*/
+ /**
+--------------------------------------------------------
+Libère proprement toute la mémoire allouée dynamiquement à la fin de la partie pour éviter les fuites de mémoire.
+--------------------------------------------------------
+ */
 FUNCTION nettoyage()
     FOR(i;0;8)
         FREE(de_faces[i])
@@ -294,19 +231,18 @@ FUNCTION nettoyage()
 
     FREE(objectifs_effectues)
 END
-
-// =====================================================================
-// LECTURE ET MISE À JOUR DE L'ÉTAT
-// =====================================================================
-
+ 
 /**
-Lit les scores/statuts des joueurs et les 9 nouveaux objectifs en début de tour.
-*/
+--------------------------------------------------------
+Reçoit les données de début de tour.
+Met à jour les scores des joueurs et les caractéristiques des 9 nouveaux objectifs (ID et ressources nécessaires).
+--------------------------------------------------------
+ */
 FUNCTION lecture_debut_tour()
     FOR(i;0;nombre_joueurs)
         player_id = READ()
         player_infos[player_id - 1]->est_actif = READ()
-        player_infos[player_id - 1]->score = READ()	
+        player_infos[player_id - 1]->score = READ() 
     ENDFOR
 
     FOR(i;0;9)
@@ -329,18 +265,18 @@ FUNCTION lecture_debut_tour()
 END
 
 /**
-    Lit les retours de mouvements de tous les joueurs et
-    met à jour l'état global des dés (face_visible_de).
- */
+--------------------------------------------------------
+Met à jour la position des dés après les mouvements de tous les joueurs.
+La fonction additionne les mouvements sur les dés partagés et applique le mouvement direct pour nos propres dés.
+--------------------------------------------------------
+ */
 FUNCTION lecture_des_bouges()
     total_moves = MALLOC(8, 0, 0, 0, 0, 0, 0, 0, 0)
 
     FOR(i;0;nombre_joueurs)
         player_id = READ()
-
         FOR(j;0;8)
             move = READ()
-
             IF (j < 4)
                 total_moves[j] = total_moves[j] + move
             ELIF (player_id == mon_id)
@@ -352,57 +288,49 @@ FUNCTION lecture_des_bouges()
     FOR(i;0;8)
         current_face = face_visible_de[i]
         final_move = total_moves[i]
-
         IF (final_move != 0)
             face_visible_de[i] = prochaine_face(i, current_face, final_move)
         ENDIF
     ENDFOR
-
     FREE(total_moves)
 END
 
 /**
-    Lit les retours de revendication de tous les joueurs et
-    met à jour objectifs_effectues.
- */
+--------------------------------------------------------
+Enregistre quels objectifs ont été complétés durant la phase actuelle.
+Cela permet d'éviter de viser un objectif qui n'est plus disponible.
+--------------------------------------------------------
+ */
 FUNCTION lecture_objectif_fini()
     FOR(i;0;nombre_joueurs)
         player_id = READ()
         claimed_oid = READ()
-
-        // ** CORRECTION LOGIQUE **
-        // On marque seulement si l'ID est > 0.
-        // On ne fait RIEN si c'est -1 (PASS) ou 0.
-        // L'ancien bloc ELSE était incorrect.
         IF (claimed_oid > 0)
             objectifs_effectues[claimed_oid] = TRUE
         ENDIF
     ENDFOR
 END
 
-// =====================================================================
-// LOGIQUE DE CALCUL (IA)
-// =====================================================================
-
 /**
-    Calcule le nombre de ressources de chaque type actuellement
-    visibles sur les 8 dés. Renvoie un MALLOC(4).
-    Index: 0=PE, 1=H3, 2=AM, 3=MN
- */
+--------------------------------------------------------
+Compte combien de ressources de chaque type sont visibles sur la table.
+Retourne un tableau de 4 entiers [PE, H3, AM, MN].
+--------------------------------------------------------
+ */
 FUNCTION calculate_current_resources()
     resource_counts = MALLOC(4, 0, 0, 0, 0)
-
     FOR(i;0;8)
         resource_code = ressource_pour_de(i)
         resource_counts[resource_code] = resource_counts[resource_code] + 1
     ENDFOR
-
     RETURN resource_counts
 END
 
 /**
-    Vérifie si un objectif est rempli par un ensemble de ressources.
- */
+--------------------------------------------------------
+Vérifie si les ressources actuelles suffisent à payer un objectif donné.
+--------------------------------------------------------
+ */
 FUNCTION check_objective_achievable(obj_ptr, counts_ptr)
     IF (counts_ptr[0] < obj_ptr->pe)
         RETURN FALSE
@@ -416,52 +344,23 @@ FUNCTION check_objective_achievable(obj_ptr, counts_ptr)
     IF (counts_ptr[3] < obj_ptr->mn)
         RETURN FALSE
     ENDIF
-
     RETURN TRUE
 END
 
 /**
-    Trouve le meilleur objectif (plus de points) qui est actuellement réalisable ET non-revendiqué.
-    Renvoie un pointeur vers l'objectif, ou NULL si aucun.
- */
-FUNCTION find_best_claimable_objective(current_resources_ptr)
-    i = 8 // Commence à l'index 8 (dernier obj Difficile)
-    WHILE(i >= 0)
-        obj_ptr = liste_objectifs[i]
-        is_claimed = objectifs_effectues[obj_ptr->id]
-
-        IF (NOT is_claimed)
-            is_achievable = check_objective_achievable(obj_ptr, current_resources_ptr)
-
-            IF (is_achievable)
-                RETURN obj_ptr
-            ENDIF
-        ENDIF
-
-        i = i - 1
-    ENDWHILE
-
-    RETURN NULL
-END
-
-/**
- * Trouve le meilleur objectif non-revendiqué à cibler.
- * Score = (Points * 100) / (Distance + 1)
- * Renvoie un pointeur vers l'objectif, ou NULL.
+--------------------------------------------------------
+Analyse la liste des objectifs et sélectionne celui qui a le meilleur score (Rapport Points / Distance). 
+Ne prend en compte que les objectifs non validés.
+--------------------------------------------------------
  */
 FUNCTION trouver_meilleur_obj()
     best_score = -1
     best_obj_ptr = NULL
-
-    // On doit recalculer les ressources pour évaluer la distance
     current_counts_ptr = calculate_current_resources()
 
-    i = 0
     FOR(i;0;9)
         obj_ptr = liste_objectifs[i]
-
         IF (NOT objectifs_effectues[obj_ptr->id])
-            // 1. Calculer la distance
             pe_missing = obj_ptr->pe - current_counts_ptr[0]
             h3_missing = obj_ptr->h3 - current_counts_ptr[1]
             am_missing = obj_ptr->am - current_counts_ptr[2]
@@ -481,12 +380,8 @@ FUNCTION trouver_meilleur_obj()
                 distance = distance + mn_missing
             ENDIF
             
-            // 2. Calculer le score (formule gloutonne)
-            // On multiplie par 100 pour la précision en entiers
-            // On ajoute +1 à la distance pour éviter la division par zéro
             score = (obj_ptr->points * 100) / (distance + 1)
             
-            // 3. Mettre à jour le meilleur
             IF (score > best_score)
                 best_score = score
                 best_obj_ptr = obj_ptr
@@ -498,41 +393,28 @@ FUNCTION trouver_meilleur_obj()
     RETURN best_obj_ptr
 END
 
-
-// =====================================================================
-// LOGIQUE DE DÉCISION (IA)
-// =====================================================================
-
 /**
-    Décide des 8 mouvements de dés à envoyer.
-    Stratégie :
-    1. Trouve le meilleur objectif (score/distance).
-    2. Pour chaque dé, trouve la ressource manquante la plus proche.
-    3. Bouge vers elle (en respectant la règle du dé partagé).
- */
+--------------------------------------------------------
+Gère l'envoi des ordres de mouvement des dés.
+L'IA cible l'objectif prioritaire, identifie les ressources manquantes, et demande aux dés de tourner vers la ressource utile la plus proche.
+--------------------------------------------------------
+ */
 FUNCTION phase_deplacement_des()
-    
-    // 1. TROUVER L'OBJECTIF CIBLE
     target_obj = trouver_meilleur_obj()
-    
-    // 3. ON A UN PLAN ! CALCULER LES RESSOURCES MANQUANTES
     current_counts_ptr = calculate_current_resources()
+    
     pe_missing = target_obj->pe - current_counts_ptr[0]
     h3_missing = target_obj->h3 - current_counts_ptr[1]
     am_missing = target_obj->am - current_counts_ptr[2]
     mn_missing = target_obj->mn - current_counts_ptr[3]
-    FREE(current_counts_ptr) // On n'a plus besoin des comptes
+    FREE(current_counts_ptr)
     
-    // 4. PLANIFIER LES 8 MOUVEMENTS
     deja_bouge = FALSE
-    
     FOR (i;0;8)
         min_dist = 999
         best_move = 0
         
-        // A. Trouver la ressource manquante la plus proche POUR CE DÉ
-        
-        // Faut-il du PE (0) ?
+        // Test successif pour chaque ressource dont on a encore besoin
         IF (pe_missing > 0)
             analysis = deplacement_de_ressource(i, 0)
             IF (analysis->distance < min_dist)
@@ -542,7 +424,6 @@ FUNCTION phase_deplacement_des()
             FREE(analysis)
         ENDIF
         
-        // Faut-il du H3 (1) ?
         IF (h3_missing > 0)
             analysis = deplacement_de_ressource(i, 1)
             IF (analysis->distance < min_dist)
@@ -552,7 +433,6 @@ FUNCTION phase_deplacement_des()
             FREE(analysis)
         ENDIF
         
-        // Faut-il du AM (2) ?
         IF (am_missing > 0)
             analysis = deplacement_de_ressource(i, 2)
             IF (analysis->distance < min_dist)
@@ -562,7 +442,6 @@ FUNCTION phase_deplacement_des()
             FREE(analysis)
         ENDIF
         
-        // Faut-il du MN (3) ?
         IF (mn_missing > 0)
             analysis = deplacement_de_ressource(i, 3)
             IF (analysis->distance < min_dist)
@@ -572,9 +451,8 @@ FUNCTION phase_deplacement_des()
             FREE(analysis)
         ENDIF
         
-        // B. Appliquer le mouvement en respectant les règles
-        
-        IF (i < 4) // Dés partagés (0-3)
+        // Envoi de la commande MOVE avec respect de la règle du dé partagé
+        IF (i < 4)
             IF (best_move != 0 AND NOT deja_bouge)
                 PRINT("MOVE ", INT, best_move, "\n")
                 deja_bouge = TRUE
@@ -585,17 +463,31 @@ FUNCTION phase_deplacement_des()
             PRINT("MOVE ", INT, best_move, "\n")
         ENDIF
     ENDFOR
-    
     FLUSH()
 END
 
 /**
-    Décide quel objectif revendiquer (ou PASS).
-    Stratégie : calcule les ressources, trouve le meilleur objectif réalisable et le revendique.
- */
+--------------------------------------------------------
+Gère la validation des objectifs.
+L'IA tente de revendiquer l'objectif le plus cher parmi ceux qu'elle peut actuellement payer.
+--------------------------------------------------------
+ */
 FUNCTION phase_revendication()
     resources_ptr = calculate_current_resources()
-    best_obj_to_claim = find_best_claimable_objective(resources_ptr)
+    
+    // Parcours inversé pour privilégier les objectifs à 200 points
+    best_obj_to_claim = NULL
+    i = 8
+    WHILE(i >= 0)
+        obj_ptr = liste_objectifs[i]
+        IF (NOT objectifs_effectues[obj_ptr->id])
+            IF (check_objective_achievable(obj_ptr, resources_ptr))
+                best_obj_to_claim = obj_ptr
+                i = -1 
+            ENDIF
+        ENDIF
+        i = i - 1
+    ENDWHILE
 
     IF (best_obj_to_claim == NULL)
         PRINT("PASS\n")
@@ -604,34 +496,24 @@ FUNCTION phase_revendication()
     ENDIF
 
     FLUSH()
-
     FREE(resources_ptr)
 END
 
-// =====================================================================
-// FONCTION PRINCIPALE
-// =====================================================================
-
+/**
+--------------------------------------------------------
+Boucle principale du jeu.
+Orchestre les 3 tours de jeu, et pour chaque tour, les 6 phases d'action composées de déplacements et de revendications.
+--------------------------------------------------------
+ */
 FUNCTION main()
     initialisation()
 
     FOR(i;0;3)
-
         lecture_debut_tour()
-
-        action_actuelle = 1
         FOR(y;0;6)
-
-            // --- Phase 1: Mouvement des Dés ---
             phase_deplacement_des()
-
-            // --- Phase 2: Lecture des Mouvements ---
             lecture_des_bouges()
-
-            // --- Phase 3: Revendication ---
             phase_revendication()
-
-            // --- Phase 4: Lecture des Revendications ---
             lecture_objectif_fini()
         ENDFOR
     ENDFOR
